@@ -1,7 +1,6 @@
 package com.stasrg.incinerator.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -20,7 +19,7 @@ fun SetupNavGraph(navController: NavHostController = rememberNavController()) {
             AwalScreen(navController)
         }
         composable(route = Screen.Web.route) {
-            WebScreen(navController)
+            WebScreen()
         }
     }
 }

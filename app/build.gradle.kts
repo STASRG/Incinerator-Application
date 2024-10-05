@@ -53,6 +53,11 @@ android {
 dependencies {
 
     implementation("androidx.core:core-ktx:1.13.1")
+    implementation ("androidx.lifecycle:lifecycle-livedata-ktx:2.3.1")
+    implementation ("androidx.compose.runtime:runtime-livedata:1.0.1")
+    implementation ("com.github.bumptech.glide:glide:4.12.0")
+    implementation ("com.github.bumptech.glide:compose:1.0.0-alpha.1")
+    annotationProcessor ("com.github.bumptech.glide:compiler:4.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
     implementation ("com.google.android.material:material:1.9.0")
     implementation ("com.google.accompanist:accompanist-swiperefresh:0.28.0")
