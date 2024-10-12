@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.view.ViewGroup
 import android.webkit.GeolocationPermissions
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -52,10 +53,9 @@ fun WebScreen() {
     var isConnected by remember { mutableStateOf(checkNetworkConnection(context)) }
     var showExitDialog by remember { mutableStateOf(false) }
 
-    // State untuk mengatur tampilan loading
-    var isLoading by remember { mutableStateOf(true) } // Set initial loading state to true
-    var lastLoadedUrl by remember { mutableStateOf("https://stas.davin.id") }
+    var isLoading by remember { mutableStateOf(true) }
     val webView = remember { WebView(context) }
+
 
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -75,7 +75,7 @@ fun WebScreen() {
     fun checkAndReload() {
         isConnected = checkNetworkConnection(context)
         if (isConnected) {
-            webView.loadUrl(lastLoadedUrl)
+            webView.reload()
         }
     }
 
@@ -105,10 +105,10 @@ fun WebScreen() {
     DisposableEffect(Unit) {
         val callback = object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView.canGoBack()) {
-                    webView.goBack()
+                if (webView.canGoBack()) {  // Mengecek apakah bisa kembali ke halaman sebelumnya
+                    webView.goBack()        // Kembali ke halaman sebelumnya
                 } else {
-                    showExitDialog = true
+                    showExitDialog = true   // Menampilkan dialog keluar jika tidak bisa kembali
                 }
             }
         }
@@ -118,6 +118,7 @@ fun WebScreen() {
         }
     }
 
+
     if (showExitDialog) {
         DisplayExitConfirmationDialog(
             onConfirm = { context.finishAffinity() },
@@ -126,11 +127,11 @@ fun WebScreen() {
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Menampilkan WebView
         AndroidView(
             factory = { ctx ->
                 val swipeRefreshLayout = SwipeRefreshLayout(ctx)
-                val webView = WebView(ctx).apply {
+                (webView.parent as? ViewGroup)?.removeView(webView)
+                webView.apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.allowFileAccess = true
@@ -163,9 +164,7 @@ fun WebScreen() {
                         override fun onPageFinished(view: WebView?, url: String?) {
                             swipeRefreshLayout.isRefreshing = false
                             isLoading = false
-                            if (url != null) {
-                                lastLoadedUrl = url
-                            }
+
                         }
 
                         override fun onReceivedError(
@@ -179,7 +178,8 @@ fun WebScreen() {
                         }
                     }
 
-                    loadUrl(lastLoadedUrl)
+
+                    loadUrl("https://incinerator.my.id")
                 }
 
                 swipeRefreshLayout.apply {
@@ -200,7 +200,6 @@ fun WebScreen() {
             update = {}
         )
 
-        // Menampilkan GIF loading setiap kali halaman mulai dimuat
         if (isLoading) {
             Box(
                 modifier = Modifier
@@ -225,7 +224,6 @@ fun WebScreen() {
         }
     }
 }
-
 
 fun checkNetworkConnection(context: Context): Boolean {
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager

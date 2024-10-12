@@ -18,7 +18,7 @@ fun DisplayExitConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) 
                 onClick = { onConfirm() },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF008507))
             ) {
-                Text("Iya")
+                Text("Iya", color = Color.White)
             }
         },
         dismissButton = {
@@ -26,7 +26,7 @@ fun DisplayExitConfirmationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) 
                 onClick = { onDismiss() },
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF850000))
             ) {
-                Text("Tidak")
+                Text("Tidak", color = Color.White)
             }
         }
     )
