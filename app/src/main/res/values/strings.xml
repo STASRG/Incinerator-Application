@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">IncineratorNews</string>
+    <string name="base_url">https://incinerator.my.id</string>
 </resources>

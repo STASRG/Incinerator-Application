@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "531058895657",
+    "project_id": "hydrothermalincinerator",
+    "storage_bucket": "hydrothermalincinerator.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:531058895657:android:b70cd07af6b301ae1a2538",
+        "android_client_info": {
+          "package_name": "com.stasrg.incinerator"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvAqETzYALgd7om_CZlkyBqA3w-WUKuP4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

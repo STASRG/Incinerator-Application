@@ -55,6 +55,7 @@ fun WebScreen() {
 
     var isLoading by remember { mutableStateOf(true) }
     val webView = remember { WebView(context) }
+    val url = context.getString(R.string.base_url)
 
 
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
@@ -179,7 +180,7 @@ fun WebScreen() {
                     }
 
 
-                    loadUrl("https://incinerator.my.id")
+                    loadUrl(url)
                 }
 
                 swipeRefreshLayout.apply {
