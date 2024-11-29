@@ -24,7 +24,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.IncineratorNews"
         android:name=".ApplicationClass"
-        tools:targetApi="31">
+        tools:targetApi="32">
 
         <!-- OneSignal Configuration -->
         <meta-data
@@ -53,7 +53,6 @@
 
         </activity>
 
-        <!-- FileProvider -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.provider"

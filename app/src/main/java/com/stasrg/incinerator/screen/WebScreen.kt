@@ -318,7 +318,7 @@ fun showNotification(context: Context, title: String, message: String, success: 
         notificationManager.createNotificationChannel(channel)
     }
 
-    // Intent untuk membuka file jika berhasil diunduh
+    // Intent untuk membuka file PDF jika berhasil diunduh
     val openFileIntent = file?.let {
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", it)
         Intent(Intent.ACTION_VIEW).apply {
