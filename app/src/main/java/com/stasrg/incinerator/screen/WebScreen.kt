@@ -356,7 +356,6 @@ fun showNotification(context: Context, title: String, message: String, success: 
     notificationManager.notify(System.currentTimeMillis().toInt(), notification)
 }
 
-
 // Menampilkan Toast di Bagian Atas
 fun showToast(context: Context, message: String, b: Boolean) {
     val toast = Toast.makeText(context, message, Toast.LENGTH_SHORT)
