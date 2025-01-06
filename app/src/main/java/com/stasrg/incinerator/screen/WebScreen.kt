@@ -5,14 +5,17 @@ import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
 import android.util.Base64
 import android.view.Gravity
 import android.view.ViewGroup
@@ -45,8 +48,10 @@ import com.stasrg.incinerator.R
 import com.stasrg.incinerator.receiver.ConnectivityReceiver
 import java.io.File
 import java.io.FileOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalGlideComposeApi::class)
 @Composable
@@ -58,6 +63,32 @@ fun WebScreen() {
 
     val webView = remember { WebView(context) }
     val url = context.getString(R.string.base_url)
+    val fileChooserCallback = remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
+    var cameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val fileChooserLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            val fileUri: Uri? = data?.data ?: cameraUri
+
+
+            val finalUri = fileUri?.let { uri ->
+                if (data?.data != null) {
+                    val localFile = createTempImageFileFromUri(context, uri)
+                    FileProvider.getUriForFile(context, "${context.packageName}.provider", localFile)
+                } else uri
+            }
+
+            fileChooserCallback.value?.onReceiveValue(finalUri?.let { arrayOf(it) })
+        } else {
+            fileChooserCallback.value?.onReceiveValue(null)
+        }
+        fileChooserCallback.value = null
+    }
+
+
 
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -132,10 +163,13 @@ fun WebScreen() {
                 webView.apply {
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
+                    settings.cacheMode = WebSettings.LOAD_NO_CACHE // Nonaktifkan cache
                     settings.allowFileAccess = true
                     settings.allowContentAccess = true
                     settings.javaScriptCanOpenWindowsAutomatically = true
                     settings.setGeolocationEnabled(true)
+                    clearCache(true) // Bersihkan cache
+                    clearHistory()   // Hapus riwayat
 
                     addJavascriptInterface(object {
                         @JavascriptInterface
@@ -145,6 +179,55 @@ fun WebScreen() {
                     }, "AndroidBlobDownloader")
 
                     webChromeClient = object : WebChromeClient() {
+                        override fun onShowFileChooser(
+                            webView: WebView?,
+                            filePathCallback: ValueCallback<Array<Uri>>?,
+                            fileChooserParams: FileChooserParams?
+                        ): Boolean {
+                            fileChooserCallback.value = filePathCallback
+
+                            // Buat intent untuk galeri
+                            val galleryIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                                type = "image/*"
+                            }
+
+                            // Buat intent untuk kamera
+                            val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+                            val photoFile: File? = try {
+                                createImageFile(context).also {
+                                    // Simpan URI hasilnya ke state cameraUri
+                                    cameraUri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.provider",
+                                        it
+                                    )
+                                }
+                            } catch (ex: IOException) {
+                                ex.printStackTrace()
+                                null
+                            }
+
+                            photoFile?.let {
+                                cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri)
+                            }
+
+                            // Gabungkan intent kamera dan galeri
+                            val intentChooser = Intent.createChooser(galleryIntent, "Pilih Sumber Gambar").apply {
+                                putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(cameraIntent))
+                            }
+
+                            try {
+                                fileChooserLauncher.launch(intentChooser)
+                            } catch (e: ActivityNotFoundException) {
+                                fileChooserCallback.value = null
+                                Toast.makeText(context, "Tidak dapat membuka file chooser", Toast.LENGTH_SHORT).show()
+                                return false
+                            }
+
+                            return true
+                        }
+
                         override fun onGeolocationPermissionsShowPrompt(
                             origin: String?,
                             callback: GeolocationPermissions.Callback?
@@ -152,6 +235,7 @@ fun WebScreen() {
                             callback?.invoke(origin, true, false)
                         }
                     }
+
 
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
@@ -178,13 +262,12 @@ fun WebScreen() {
                     setDownloadListener { url, _, _, _, _ ->
                         if (url.startsWith("blob:")) {
                             evaluateJavascript("handleBlobURL('$url')", null)
-                        } else {
-                            downloadPDF(context, url)
                         }
                     }
 
-                    loadUrl(url)
+                    loadUrl("$url?timestamp=${System.currentTimeMillis()}")
                 }
+
 
                 swipeRefreshLayout.apply {
                     addView(
@@ -229,76 +312,34 @@ fun WebScreen() {
     }
 }
 
-
 fun saveBlobDataAsPDF(context: Context, base64Data: String) {
-    val folderName = "Incinerator"
-    val fileName = "PDF_${System.currentTimeMillis()}.pdf"
+    // Ambil nama aplikasi dari resource string
+    val appName = context.getString(R.string.app_name)
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        saveFileToMediaStore(context, fileName, Base64.decode(base64Data, Base64.DEFAULT))
-        showNotification(context, "Unduh Berhasil", "File disimpan di Download/$folderName", true)
-        showToast(context, "File berhasil diunduh", true)
-    } else {
-        val folderPath = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), folderName)
-        if (!folderPath.exists()) folderPath.mkdirs()
+    // Path folder penyimpanan: /Download/AppName/
+    val folderPath = File(
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+        appName
+    )
+    if (!folderPath.exists()) folderPath.mkdirs()
 
-        val file = File(folderPath, fileName)
-        try {
-            val decodedData = Base64.decode(base64Data, Base64.DEFAULT)
-            FileOutputStream(file).use { it.write(decodedData) }
-            showNotification(context, "Unduh Berhasil", "File disimpan di ${file.absolutePath}", true, file)
-            showToast(context, "File berhasil diunduh", true)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            showNotification(context, "Unduh Gagal", "Terjadi kesalahan saat menyimpan file", false)
-            showToast(context, "Gagal menyimpan file", false)
-        }
-    }
-}
+    // Format tanggal dan waktu
+    val currentDate = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID")).format(Date())
+    val currentTime = SimpleDateFormat("HH.mm.ss", Locale.getDefault()).format(Date())
 
-fun downloadPDF(context: Context, fileUrl: String) {
-    val folderName = "Incinerator"
-    val fileName = "PDF_${System.currentTimeMillis()}.pdf"
+    // Nama file
+    val fileName = "Invoice, $currentDate pada $currentTime.pdf"
+    val file = File(folderPath, fileName)
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        Thread {
-            try {
-                val url = URL(fileUrl)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.inputStream.use { input ->
-                    val data = input.readBytes()
-                    saveFileToMediaStore(context, fileName, data)
-                    showNotification(context, "Unduh Berhasil", "File disimpan di Download/$folderName", true)
-                    showToast(context, "File berhasil diunduh", true)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                showNotification(context, "Unduh Gagal", "Terjadi kesalahan saat mengunduh file", false)
-                showToast(context, "Gagal mengunduh file", true)
-            }
-        }.start()
-    } else {
-        val folderPath = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), folderName)
-        if (!folderPath.exists()) folderPath.mkdirs()
-
-        val file = File(folderPath, fileName)
-        Thread {
-            try {
-                val url = URL(fileUrl)
-                val connection = url.openConnection() as HttpURLConnection
-                connection.inputStream.use { input ->
-                    FileOutputStream(file).use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                showNotification(context, "Unduh Berhasil", "File disimpan di ${file.absolutePath}", true)
-                showToast(context, "File berhasil diunduh", true)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                showNotification(context, "Unduh Gagal", "Terjadi kesalahan saat mengunduh file", false)
-                showToast(context, "Gagal mengunduh file", true)
-            }
-        }.start()
+    try {
+        val decodedData = Base64.decode(base64Data, Base64.DEFAULT)
+        FileOutputStream(file).use { it.write(decodedData) }
+        showNotification(context, "Unduh Berhasil", "Ketuk Untuk Membuka Folder", true, file)
+        showToast(context, "File berhasil diunduh dengan nama: $fileName", true)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        showNotification(context, "Unduh Gagal", "Terjadi kesalahan saat menyimpan file", false)
+        showToast(context, "Gagal menyimpan file", false)
     }
 }
 
@@ -318,24 +359,26 @@ fun showNotification(context: Context, title: String, message: String, success: 
         notificationManager.createNotificationChannel(channel)
     }
 
-    // Intent untuk membuka file PDF jika berhasil diunduh
-    val openFileIntent = file?.let {
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", it)
-        Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/pdf")
-            flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
+    // Intent untuk membuka folder tempat file disimpan
+    val folderIntent = Intent(Intent.ACTION_VIEW).apply {
+        file?.parentFile?.let { folder ->
+            val folderUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.provider",
+                folder
+            )
+            setDataAndType(folderUri, "resource/folder") // Format folder
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
         }
     }
 
     // PendingIntent untuk notifikasi
-    val pendingIntent = openFileIntent?.let {
-        PendingIntent.getActivity(
-            context,
-            System.currentTimeMillis().toInt(), // RequestCode unik
-            it,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-    }
+    val pendingIntent = PendingIntent.getActivity(
+        context,
+        System.currentTimeMillis().toInt(),
+        folderIntent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+    )
 
     // Membuat notifikasi
     val notification = NotificationCompat.Builder(context, channelId)
@@ -343,13 +386,8 @@ fun showNotification(context: Context, title: String, message: String, success: 
         .setContentTitle(title)
         .setContentText(message)
         .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setContentIntent(pendingIntent) // Arahkan ke folder tempat file disimpan
         .setAutoCancel(true) // Hapus notifikasi setelah diklik
-        .apply {
-            // Tambahkan PendingIntent hanya jika file tersedia
-            if (success && pendingIntent != null) {
-                setContentIntent(pendingIntent)
-            }
-        }
         .build()
 
     // Menampilkan notifikasi
@@ -361,22 +399,6 @@ fun showToast(context: Context, message: String, b: Boolean) {
     val toast = Toast.makeText(context, message, Toast.LENGTH_SHORT)
     toast.setGravity(Gravity.TOP or Gravity.CENTER_HORIZONTAL, 0, 200)
     toast.show()
-}
-
-fun saveFileToMediaStore(context: Context, fileName: String, data: ByteArray) {
-    val resolver = context.contentResolver
-    val contentValues = android.content.ContentValues().apply {
-        put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-        put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
-        put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Incinerator")
-    }
-
-    val uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
-    uri?.let {
-        resolver.openOutputStream(it).use { outputStream ->
-            outputStream?.write(data)
-        }
-    }
 }
 
 fun injectBlobDownloadHandler(webView: WebView?) {
@@ -397,6 +419,20 @@ fun injectBlobDownloadHandler(webView: WebView?) {
     )
 }
 
+// Fungsi untuk menyalin file dari URI pemilih media ke file lokal
+fun createTempImageFileFromUri(context: Context, uri: Uri): File {
+    val inputStream = context.contentResolver.openInputStream(uri)
+    val tempFile = File.createTempFile(
+        "temp_image_${System.currentTimeMillis()}",
+        ".jpg",
+        context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+    )
+    inputStream?.use { input ->
+        FileOutputStream(tempFile).use { output -> input.copyTo(output) }
+    }
+    return tempFile
+}
+
 fun checkNetworkConnection(context: Context): Boolean {
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     val network = connectivityManager.activeNetwork ?: return false
@@ -406,4 +442,15 @@ fun checkNetworkConnection(context: Context): Boolean {
         activeNetwork.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> true
         else -> false
     }
+}
+
+@Throws(IOException::class)
+fun createImageFile(context: Context): File {
+    val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+    val storageDir: File? = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
+    return File.createTempFile(
+        "JPEG_${timeStamp}_", /* prefix */
+        ".jpg",              /* suffix */
+        storageDir           /* directory */
+    )
 }
