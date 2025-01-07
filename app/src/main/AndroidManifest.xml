@@ -49,7 +49,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <data android:scheme="https" android:host="incinerator.my.id" />
+                <data android:scheme="https" android:host="@string/direct_url" />
             </intent-filter>
 
         </activity>

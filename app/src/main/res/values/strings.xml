@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Incinerator Catalog</string>
     <string name="base_url">https://catalog.incinerator.my.id</string>
+    <string name="direct_url">catalog.incinerator.my.id</string>
 </resources>
