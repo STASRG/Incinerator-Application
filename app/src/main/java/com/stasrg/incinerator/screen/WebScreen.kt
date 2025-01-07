@@ -240,7 +240,7 @@ fun WebScreen() {
                     webViewClient = object : WebViewClient() {
                         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                             isLoading = true
-                        }
+                            }
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             injectBlobDownloadHandler(view)
