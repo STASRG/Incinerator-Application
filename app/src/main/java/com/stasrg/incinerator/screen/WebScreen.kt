@@ -236,11 +236,44 @@ fun WebScreen() {
                         }
                     }
 
-
                     webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                            val url = request?.url.toString()
+
+                            // Periksa apakah URL tidak dimulai dengan http:// atau https://
+                            return if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                                try {
+                                    // Buat intent dari URL
+                                    val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                                    // Periksa apakah aplikasi yang sesuai tersedia
+                                    if (intent.resolveActivity(view?.context?.packageManager!!) != null) {
+                                        view.context.startActivity(intent)
+                                    } else {
+                                        // Tampilkan pesan jika aplikasi tidak ditemukan
+                                        val fallbackUrl = intent.getStringExtra("browser_fallback_url")
+                                        if (!fallbackUrl.isNullOrEmpty()) {
+                                            view.context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)))
+                                        } else {
+                                            Toast.makeText(view.context, "Aplikasi tidak ditemukan", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    true // URL sudah ditangani
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                    Toast.makeText(view?.context, "Tidak dapat membuka URL", Toast.LENGTH_SHORT).show()
+                                    false
+                                }
+                            } else {
+                                // Jika URL dimulai dengan http:// atau https://, biarkan WebView menangani
+                                false
+                            }
+                        }
+
                         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                             isLoading = true
-                            }
+                        }
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             injectBlobDownloadHandler(view)
