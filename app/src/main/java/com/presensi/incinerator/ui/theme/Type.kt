@@ -1,4 +1,4 @@
-package com.stasrg.incinerator.ui.theme
+package com.presensi.incinerator.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle

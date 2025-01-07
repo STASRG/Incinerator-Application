@@ -1,4 +1,4 @@
-package com.stasrg.incinerator.screen
+package com.presensi.incinerator.screen
 
 import android.app.Activity
 import androidx.activity.OnBackPressedCallback
@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.stasrg.incinerator.R
+import com.presensi.incinerator.R
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat

@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">Incinerator Catalog</string>
-    <string name="base_url">https://catalog.incinerator.my.id</string>
+    <string name="app_name">Incinerator Presensi</string>
+    <string name="base_url">https://presensi.incinerator.my.id</string>
 </resources>

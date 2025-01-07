@@ -1,4 +1,4 @@
-package com.stasrg.incinerator.screen
+package com.presensi.incinerator.screen
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background // Import the background modifier
@@ -19,9 +19,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import androidx.navigation.compose.rememberNavController
-import com.stasrg.incinerator.R
-import com.stasrg.incinerator.navigation.Screen
-import com.stasrg.incinerator.ui.theme.IncineratorTheme
+import com.presensi.incinerator.R
+import com.presensi.incinerator.navigation.Screen
+import com.presensi.incinerator.ui.theme.IncineratorTheme
 import kotlinx.coroutines.delay
 
 @Composable

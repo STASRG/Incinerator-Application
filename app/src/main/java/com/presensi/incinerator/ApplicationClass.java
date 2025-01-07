@@ -1,4 +1,4 @@
-package com.stasrg.incinerator;
+package com.presensi.incinerator;
 
 import android.app.Application;
 import com.onesignal.OneSignal;

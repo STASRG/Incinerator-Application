@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.stasrg.incinerator"
+    namespace = "com.presensi.incinerator"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.stasrg.incinerator"
+        applicationId = "com.presensi.incinerator"
         minSdk = 31
         targetSdk = 34
         versionCode = 1

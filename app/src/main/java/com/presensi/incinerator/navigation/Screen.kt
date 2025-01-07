@@ -1,4 +1,4 @@
-package com.stasrg.incinerator.navigation
+package com.presensi.incinerator.navigation
 
 sealed class Screen(val route: String) {
     data object Awal : Screen("awalScreen")

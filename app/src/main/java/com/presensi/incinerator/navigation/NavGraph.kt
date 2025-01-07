@@ -1,12 +1,12 @@
-package com.stasrg.incinerator.navigation
+package com.presensi.incinerator.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.stasrg.incinerator.screen.AwalScreen
-import com.stasrg.incinerator.screen.WebScreen
+import com.presensi.incinerator.screen.AwalScreen
+import com.presensi.incinerator.screen.WebScreen
 
 
 @Composable

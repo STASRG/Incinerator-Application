@@ -1,4 +1,4 @@
-package com.stasrg.incinerator.screen
+package com.presensi.incinerator.screen
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button

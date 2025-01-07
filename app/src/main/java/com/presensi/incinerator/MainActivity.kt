@@ -1,4 +1,4 @@
-package com.stasrg.incinerator
+package com.presensi.incinerator
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
-import com.stasrg.incinerator.navigation.SetupNavGraph
-import com.stasrg.incinerator.ui.theme.IncineratorTheme
+import com.presensi.incinerator.navigation.SetupNavGraph
+import com.presensi.incinerator.ui.theme.IncineratorTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

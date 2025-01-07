@@ -1,11 +1,10 @@
-package com.stasrg.incinerator.screen
+package com.presensi.incinerator.screen
 
 import android.Manifest
 import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -15,7 +14,6 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
-import android.provider.MediaStore
 import android.util.Base64
 import android.view.Gravity
 import android.view.ViewGroup
@@ -44,8 +42,8 @@ import androidx.core.content.FileProvider
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.bumptech.glide.integration.compose.ExperimentalGlideComposeApi
 import com.bumptech.glide.integration.compose.GlideImage
-import com.stasrg.incinerator.R
-import com.stasrg.incinerator.receiver.ConnectivityReceiver
+import com.presensi.incinerator.R
+import com.presensi.incinerator.receiver.ConnectivityReceiver
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -63,31 +61,6 @@ fun WebScreen() {
 
     val webView = remember { WebView(context) }
     val url = context.getString(R.string.base_url)
-    val fileChooserCallback = remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
-    var cameraUri by remember { mutableStateOf<Uri?>(null) }
-
-    val fileChooserLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val data = result.data
-            val fileUri: Uri? = data?.data ?: cameraUri
-
-
-            val finalUri = fileUri?.let { uri ->
-                if (data?.data != null) {
-                    val localFile = createTempImageFileFromUri(context, uri)
-                    FileProvider.getUriForFile(context, "${context.packageName}.provider", localFile)
-                } else uri
-            }
-
-            fileChooserCallback.value?.onReceiveValue(finalUri?.let { arrayOf(it) })
-        } else {
-            fileChooserCallback.value?.onReceiveValue(null)
-        }
-        fileChooserCallback.value = null
-    }
-
 
 
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
@@ -119,6 +92,9 @@ fun WebScreen() {
         }
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            permissionsToRequest.add(Manifest.permission.CAMERA)
         }
         if (permissionsToRequest.isNotEmpty()) {
             requestPermissionsLauncher.launch(permissionsToRequest.toTypedArray())
@@ -179,55 +155,9 @@ fun WebScreen() {
                     }, "AndroidBlobDownloader")
 
                     webChromeClient = object : WebChromeClient() {
-                        override fun onShowFileChooser(
-                            webView: WebView?,
-                            filePathCallback: ValueCallback<Array<Uri>>?,
-                            fileChooserParams: FileChooserParams?
-                        ): Boolean {
-                            fileChooserCallback.value = filePathCallback
-
-                            // Buat intent untuk galeri
-                            val galleryIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                                addCategory(Intent.CATEGORY_OPENABLE)
-                                type = "image/*"
-                            }
-
-                            // Buat intent untuk kamera
-                            val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-                            val photoFile: File? = try {
-                                createImageFile(context).also {
-                                    // Simpan URI hasilnya ke state cameraUri
-                                    cameraUri = FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.provider",
-                                        it
-                                    )
-                                }
-                            } catch (ex: IOException) {
-                                ex.printStackTrace()
-                                null
-                            }
-
-                            photoFile?.let {
-                                cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri)
-                            }
-
-                            // Gabungkan intent kamera dan galeri
-                            val intentChooser = Intent.createChooser(galleryIntent, "Pilih Sumber Gambar").apply {
-                                putExtra(Intent.EXTRA_INITIAL_INTENTS, arrayOf(cameraIntent))
-                            }
-
-                            try {
-                                fileChooserLauncher.launch(intentChooser)
-                            } catch (e: ActivityNotFoundException) {
-                                fileChooserCallback.value = null
-                                Toast.makeText(context, "Tidak dapat membuka file chooser", Toast.LENGTH_SHORT).show()
-                                return false
-                            }
-
-                            return true
+                        override fun onPermissionRequest(request: PermissionRequest) {
+                            request.grant(request.resources)
                         }
-
                         override fun onGeolocationPermissionsShowPrompt(
                             origin: String?,
                             callback: GeolocationPermissions.Callback?
@@ -238,9 +168,43 @@ fun WebScreen() {
 
 
                     webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                            val url = request?.url.toString()
+
+                            // Periksa apakah URL tidak dimulai dengan http:// atau https://
+                            return if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                                try {
+                                    // Buat intent dari URL
+                                    val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+                                    // Periksa apakah aplikasi yang sesuai tersedia
+                                    if (intent.resolveActivity(view?.context?.packageManager!!) != null) {
+                                        view.context.startActivity(intent)
+                                    } else {
+                                        // Tampilkan pesan jika aplikasi tidak ditemukan
+                                        val fallbackUrl = intent.getStringExtra("browser_fallback_url")
+                                        if (!fallbackUrl.isNullOrEmpty()) {
+                                            view.context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl)))
+                                        } else {
+                                            Toast.makeText(view.context, "Aplikasi tidak ditemukan", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                    true // URL sudah ditangani
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                    Toast.makeText(view?.context, "Tidak dapat membuka URL", Toast.LENGTH_SHORT).show()
+                                    false
+                                }
+                            } else {
+                                // Jika URL dimulai dengan http:// atau https://, biarkan WebView menangani
+                                false
+                            }
+                        }
+
                         override fun onPageStarted(view: WebView?, url: String?, favicon: android.graphics.Bitmap?) {
                             isLoading = true
-                        }
+                            }
 
                         override fun onPageFinished(view: WebView?, url: String?) {
                             injectBlobDownloadHandler(view)
@@ -419,19 +383,6 @@ fun injectBlobDownloadHandler(webView: WebView?) {
     )
 }
 
-// Fungsi untuk menyalin file dari URI pemilih media ke file lokal
-fun createTempImageFileFromUri(context: Context, uri: Uri): File {
-    val inputStream = context.contentResolver.openInputStream(uri)
-    val tempFile = File.createTempFile(
-        "temp_image_${System.currentTimeMillis()}",
-        ".jpg",
-        context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-    )
-    inputStream?.use { input ->
-        FileOutputStream(tempFile).use { output -> input.copyTo(output) }
-    }
-    return tempFile
-}
 
 fun checkNetworkConnection(context: Context): Boolean {
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -444,13 +395,3 @@ fun checkNetworkConnection(context: Context): Boolean {
     }
 }
 
-@Throws(IOException::class)
-fun createImageFile(context: Context): File {
-    val timeStamp: String = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-    val storageDir: File? = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES)
-    return File.createTempFile(
-        "JPEG_${timeStamp}_", /* prefix */
-        ".jpg",              /* suffix */
-        storageDir           /* directory */
-    )
-}
