@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Incinerator Presensi</string>
     <string name="base_url">https://presensi.incinerator.my.id</string>
+    <string name="direct_url">presensi.incinerator.my.id</string>
 </resources>

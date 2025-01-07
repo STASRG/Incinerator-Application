@@ -46,7 +46,6 @@ import com.presensi.incinerator.R
 import com.presensi.incinerator.receiver.ConnectivityReceiver
 import java.io.File
 import java.io.FileOutputStream
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
