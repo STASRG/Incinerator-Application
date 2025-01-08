@@ -2,6 +2,7 @@ package com.presensi.incinerator.screen
 
 import android.Manifest
 import android.app.Activity
+import android.app.DownloadManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -61,6 +62,19 @@ fun WebScreen() {
     val webView = remember { WebView(context) }
     val url = context.getString(R.string.base_url)
 
+    var fileChooserCallback by remember { mutableStateOf<ValueCallback<Array<Uri>>?>(null) }
+    val fileChooserLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val data = result.data
+            val resultUris = WebChromeClient.FileChooserParams.parseResult(result.resultCode, data)
+            fileChooserCallback?.onReceiveValue(resultUris)
+        } else {
+            fileChooserCallback?.onReceiveValue(null)
+        }
+        fileChooserCallback = null
+    }
 
     val requestPermissionsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -86,9 +100,17 @@ fun WebScreen() {
 
     LaunchedEffect(Unit) {
         val permissionsToRequest = mutableListOf<String>()
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                permissionsToRequest.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            }
         }
+        if (permissionsToRequest.isNotEmpty()) {
+            requestPermissionsLauncher.launch(permissionsToRequest.toTypedArray())
+        }
+
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             permissionsToRequest.add(Manifest.permission.ACCESS_FINE_LOCATION)
         }
@@ -154,6 +176,38 @@ fun WebScreen() {
                     }, "AndroidBlobDownloader")
 
                     webChromeClient = object : WebChromeClient() {
+                        override fun onShowFileChooser(
+                            webView: WebView?,
+                            filePathCallback: ValueCallback<Array<Uri>>?,
+                            fileChooserParams: FileChooserParams?
+                        ): Boolean {
+                            fileChooserCallback = filePathCallback
+
+                            // Buat intent untuk memilih file
+                            val fileIntent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                                type = "*/*" // Tampilkan semua jenis file
+                                addCategory(Intent.CATEGORY_OPENABLE)
+                            }
+
+                            // Gunakan launcher untuk membuka file chooser
+                            return try {
+                                fileChooserLauncher.launch(
+                                    Intent.createChooser(
+                                        fileIntent,
+                                        "Pilih File"
+                                    )
+                                )
+                                true
+                            } catch (e: Exception) {
+                                fileChooserCallback = null
+                                Toast.makeText(
+                                    context,
+                                    "Tidak dapat membuka file chooser",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                                false
+                            }
+                        }
                         override fun onPermissionRequest(request: PermissionRequest) {
                             request.grant(request.resources)
                         }
@@ -164,7 +218,6 @@ fun WebScreen() {
                             callback?.invoke(origin, true, false)
                         }
                     }
-
 
                     webViewClient = object : WebViewClient() {
                         override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
@@ -222,9 +275,34 @@ fun WebScreen() {
                         }
                     }
 
-                    setDownloadListener { url, _, _, _, _ ->
-                        if (url.startsWith("blob:")) {
-                            evaluateJavascript("handleBlobURL('$url')", null)
+                    webView.setDownloadListener { url, _, contentDisposition, mimeType, _ ->
+                        try {
+                            if (url.startsWith("blob:")) {
+                                // Tangani file `blob:` menggunakan JavaScript
+                                webView.evaluateJavascript("handleBlobURL('$url')", null)
+                            } else {
+                                // Tangani unduhan dengan URL biasa menggunakan DownloadManager
+                                val request = DownloadManager.Request(Uri.parse(url)).apply {
+                                    setTitle(URLUtil.guessFileName(url, contentDisposition, mimeType))
+                                    setDescription("Mengunduh file...")
+                                    setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                                    setAllowedOverMetered(true)
+                                    setAllowedOverRoaming(true)
+                                    setDestinationInExternalPublicDir(
+                                        Environment.DIRECTORY_DOWNLOADS,
+                                        URLUtil.guessFileName(url, contentDisposition, mimeType)
+                                    )
+                                }
+
+                                val downloadManager =
+                                    context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                                downloadManager.enqueue(request)
+
+                                Toast.makeText(context, "Unduhan dimulai...", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Terjadi kesalahan saat mengunduh file", Toast.LENGTH_SHORT).show()
+                            e.printStackTrace()
                         }
                     }
 
@@ -381,7 +459,6 @@ fun injectBlobDownloadHandler(webView: WebView?) {
         """.trimIndent(), null
     )
 }
-
 
 fun checkNetworkConnection(context: Context): Boolean {
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
