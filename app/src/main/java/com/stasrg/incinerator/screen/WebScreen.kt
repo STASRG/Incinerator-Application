@@ -60,6 +60,8 @@ fun WebScreen() {
     var isConnected by remember { mutableStateOf(checkNetworkConnection(context)) }
     var showExitDialog by remember { mutableStateOf(false) }
     var isLoading by remember { mutableStateOf(true) }
+    var downloadedFileName: String? = null
+
 
     val webView = remember { WebView(context) }
     val url = context.getString(R.string.base_url)
@@ -171,12 +173,14 @@ fun WebScreen() {
                     clearCache(true) // Bersihkan cache
                     clearHistory()   // Hapus riwayat
 
-                    addJavascriptInterface(object {
+                    webView.addJavascriptInterface(object {
                         @JavascriptInterface
-                        fun processBlobData(base64Data: String) {
-                            saveBlobDataAsPDF(context, base64Data)
+                        fun savePdfToDevice(base64Data: String, fileName: String) {
+                            saveBlobDataAsPDF(context, base64Data, fileName)
                         }
-                    }, "AndroidBlobDownloader")
+                    }, "AndroidDownloader")
+
+
 
                     webChromeClient = object : WebChromeClient() {
                         override fun onShowFileChooser(
@@ -345,24 +349,14 @@ fun WebScreen() {
     }
 }
 
-fun saveBlobDataAsPDF(context: Context, base64Data: String) {
-    // Ambil nama aplikasi dari resource string
-    val appName = context.getString(R.string.app_name)
-
+fun saveBlobDataAsPDF(context: Context, base64Data: String, fileName: String) {
     // Path folder penyimpanan: /Download/AppName/
-    val folderPath = File(
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-        appName
-    )
+    val appName = context.getString(R.string.app_name)
+    val folderPath = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), appName)
     if (!folderPath.exists()) folderPath.mkdirs()
 
-    // Format tanggal dan waktu
-    val currentDate = SimpleDateFormat("dd MMMM yyyy", Locale("id", "ID")).format(Date())
-    val currentTime = SimpleDateFormat("HH.mm.ss", Locale.getDefault()).format(Date())
-
-    // Nama file
-    val fileName = "Invoice, $currentDate pada $currentTime.pdf"
-    val file = File(folderPath, fileName)
+    // Simpan file dengan nama yang diterima dari Web
+    val file = File(folderPath, "$fileName.pdf")
 
     try {
         val decodedData = Base64.decode(base64Data, Base64.DEFAULT)
@@ -375,6 +369,8 @@ fun saveBlobDataAsPDF(context: Context, base64Data: String) {
         showToast(context, "Gagal menyimpan file", false)
     }
 }
+
+
 
 fun showNotification(context: Context, title: String, message: String, success: Boolean, file: File? = null) {
     val channelId = "download_channel"
@@ -484,6 +480,6 @@ fun createImageFile(context: Context): File {
     return File.createTempFile(
         "JPEG_${timeStamp}_", /* prefix */
         ".jpg",              /* suffix */
-        storageDir           /* directory */
+        storageDir           /* directory */
     )
 }
